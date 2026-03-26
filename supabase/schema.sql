@@ -1,0 +1,4 @@
+-- Canonical schema lives in supabase/migrations/.
+-- This file is kept as a convenience copy for inspection only.
+--
+-- Current document identity is `(meeting_date, document_type)`.

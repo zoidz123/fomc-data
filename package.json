@@ -1,0 +1,29 @@
+{
+  "name": "fed-corpus-rag",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun",
+  "scripts": {
+    "import:csv": "bun run src/importCsv.ts",
+    "embed": "bun run src/embedChunks.ts",
+    "mcp": "bun run src/mcp-server.ts",
+    "mcp:http": "bun run src/mcp-server-http.ts",
+    "start": "bun run src/mcp-server-http.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.28.0",
+    "@supabase/supabase-js": "^2.49.4",
+    "csv-parse": "^5.6.0",
+    "express": "^5.2.1",
+    "gpt-tokenizer": "^2.9.0",
+    "openai": "^6.33.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.7",
+    "@types/express": "^5.0.6",
+    "typescript": "^5.8.2"
+  }
+}
