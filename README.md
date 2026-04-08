@@ -1,27 +1,60 @@
-# fed-corpus-rag
+# fed-mcp
 
-Local ingestion pipeline for FOMC statements and minutes into Supabase-backed tables for chunked retrieval.
+MCP server for semantic search across the entire FOMC corpus — every statement and meeting minutes from 2000 to present.
 
-## Scope
+Ask your AI assistant questions about Federal Reserve monetary policy, and it searches 25+ years of primary source documents using vector similarity.
 
-- Fetch the public `communications.csv` dataset
-- Normalize each row into `fed_documents`
-- Chunk each document into `fed_document_chunks`
-- Leave embeddings and query tools for the next step
+## Background
 
-## Setup
+The Federal Open Market Committee (FOMC) meets eight times a year to set US monetary policy. After each meeting they release a statement with their interest rate decision, economic outlook, and forward guidance. Detailed meeting minutes follow ~3 weeks later. These documents are the primary signal for how the Fed thinks about inflation, employment, and the economy — and they move markets immediately on release.
 
-1. Copy `.env.example` to `.env`
-2. Fill in `SUPABASE_URL` and `SUPABASE_SECRET_KEY`
-3. Link the repo to your Supabase project with `supabase link --project-ref <project-ref>`
-4. Run `supabase db push`
-5. Run `bun install`
-6. Run `bun run import:csv`
+This server makes the full corpus of FOMC statements and minutes searchable by any MCP-compatible AI assistant.
 
-## Notes
+## What it does
 
-- This first pass does not generate embeddings yet
-- Chunking is deterministic and paragraph-aware
-- The importer is idempotent on `(meeting_date, release_date, document_type)`
-- The canonical database schema lives in `supabase/migrations/`
-- If the remote CSV download is flaky, set `FED_COMMUNICATIONS_CSV_PATH` to a local file and the importer will use that instead of the URL
+- **`search_fed_topic`** — Semantic search across all FOMC documents. Supports date range and document type filters.
+- **`fetch_fed_documents_by_date_range`** — Fetch full documents within a date range, chronologically ordered.
+- **`fetch_fed_document`** — Fetch a single document by meeting date and type.
+
+## Example queries
+
+```
+"How has the Fed's language on inflation evolved from 2021 to 2023?"
+
+"What did the FOMC say about balance sheet reduction in 2017-2019?"
+
+"Show me the emergency COVID statement from March 15, 2020"
+
+"Compare how the Fed discussed unemployment during the 2008 crisis vs 2020"
+```
+
+## Add to Claude Code
+
+```bash
+claude mcp add --transport http fed-mcp https://fomc-data-production.up.railway.app/mcp
+```
+
+## Add to Codex
+
+```bash
+codex mcp add fed-mcp --url https://fomc-data-production.up.railway.app/mcp
+```
+
+Or add directly to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.fed-mcp]
+url = "https://fomc-data-production.up.railway.app/mcp"
+```
+
+## Architecture
+
+Supabase (pgvector) for storage, OpenAI `text-embedding-3-small` for embeddings, cosine similarity search via a Postgres RPC function. ~1,200 FOMC documents chunked paragraph-aware.
+
+## Data source
+
+FOMC communications dataset from [vtasca/fed-statement-scraping](https://github.com/vtasca/fed-statement-scraping). Covers FOMC statements and minutes from 2000 to present, automatically scraped from the Federal Reserve website after each release.
+
+## License
+
+MIT

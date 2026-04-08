@@ -8,6 +8,8 @@ import {
   fetchDocumentsByDateRange,
   fetchDocument,
 } from "./tools.js";
+import { runImport } from "./importCsv.js";
+import { runEmbed } from "./embedChunks.js";
 
 const { supabase, openai } = createClients();
 
@@ -240,7 +242,72 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
+// Ingest endpoint — fetches latest FOMC data and generates embeddings
+// Trigger via Railway cron or manually: curl -X POST http://localhost:3000/ingest
+let ingestRunning = false;
+
+app.post("/ingest", async (req, res) => {
+  const token = process.env.INGEST_TOKEN;
+  if (token && req.headers.authorization !== `Bearer ${token}`) {
+    res.status(401).json({ status: "unauthorized" });
+    return;
+  }
+
+  if (ingestRunning) {
+    res.status(409).json({ status: "already_running" });
+    return;
+  }
+
+  ingestRunning = true;
+  const startTime = Date.now();
+
+  try {
+    console.log("[ingest] starting scheduled ingest...");
+    const importResult = await runImport();
+    const embedResult = await runEmbed();
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+
+    console.log(`[ingest] completed in ${duration}s`);
+    res.json({
+      status: "ok",
+      duration_seconds: parseFloat(duration),
+      import: importResult,
+      embed: embedResult,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("[ingest] failed:", message);
+    res.status(500).json({ status: "error", error: message });
+  } finally {
+    ingestRunning = false;
+  }
+});
+
 const port = parseInt(process.env.PORT || "3000", 10);
 app.listen(port, "0.0.0.0", () => {
   console.log(`[mcp] server listening on port ${port}`);
+
+  // Daily ingest — runs import + embed every 24 hours
+  const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+
+  async function scheduledIngest() {
+    if (ingestRunning) {
+      console.log("[cron] ingest already running, skipping");
+      return;
+    }
+    ingestRunning = true;
+    try {
+      console.log("[cron] starting daily ingest...");
+      const importResult = await runImport();
+      const embedResult = await runEmbed();
+      console.log(`[cron] done — imported ${importResult.inserted} new docs, embedded ${embedResult.embedded} chunks`);
+    } catch (error) {
+      console.error("[cron] ingest failed:", error);
+    } finally {
+      ingestRunning = false;
+    }
+  }
+
+  setInterval(scheduledIngest, TWENTY_FOUR_HOURS);
+  console.log("[cron] daily ingest scheduled (every 24h)");
 });

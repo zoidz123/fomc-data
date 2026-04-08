@@ -113,7 +113,11 @@ async function writeEmbeddingsWithThrottle(
   }
 }
 
-async function main() {
+export type EmbedResult = {
+  embedded: number;
+};
+
+export async function runEmbed(): Promise<EmbedResult> {
   const env = envSchema.parse(process.env);
 
   const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_SECRET_KEY, {
@@ -127,7 +131,7 @@ async function main() {
 
   if (chunks.length === 0) {
     console.log("[embed] all chunks already have embeddings, nothing to do");
-    return;
+    return { embedded: 0 };
   }
 
   console.log(`[embed] found ${chunks.length} chunks to embed`);
@@ -166,9 +170,16 @@ async function main() {
   }
 
   console.log(`[embed] done — embedded ${processedCount} chunks`);
+  return { embedded: processedCount };
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+// Run directly as a script
+const isMainModule = import.meta.url === `file://${process.argv[1]}` ||
+  process.argv[1]?.endsWith("embedChunks.ts");
+
+if (isMainModule) {
+  runEmbed().catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+}

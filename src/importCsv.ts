@@ -193,7 +193,15 @@ async function fetchExistingDocuments(
   return existingDocuments;
 }
 
-async function main() {
+export type ImportResult = {
+  total: number;
+  inserted: number;
+  updated: number;
+  skipped: number;
+  chunks: number;
+};
+
+export async function runImport(): Promise<ImportResult> {
   const env = envSchema.parse(process.env);
   console.log("[import] starting import");
   const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_SECRET_KEY, {
@@ -259,7 +267,13 @@ async function main() {
 
   if (documentsToWrite.length === 0) {
     console.log("[import] no document changes detected");
-    return;
+    return {
+      total: parsedDocuments.size,
+      inserted: 0,
+      updated: 0,
+      skipped: skippedDocuments,
+      chunks: 0,
+    };
   }
 
   const persistedDocuments = new Map<string, ExistingDocument>();
@@ -384,9 +398,23 @@ async function main() {
   console.log(
     `[import] completed: processed=${parsedDocuments.size}, inserted_documents=${insertedDocuments}, updated_documents=${updatedDocuments}, skipped_documents=${skippedDocuments}, inserted_chunks=${insertedChunks}`
   );
+
+  return {
+    total: parsedDocuments.size,
+    inserted: insertedDocuments,
+    updated: updatedDocuments,
+    skipped: skippedDocuments,
+    chunks: insertedChunks,
+  };
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+// Run directly as a script
+const isMainModule = import.meta.url === `file://${process.argv[1]}` ||
+  process.argv[1]?.endsWith("importCsv.ts");
+
+if (isMainModule) {
+  runImport().catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+}
